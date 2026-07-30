@@ -1,0 +1,9 @@
+{
+  "name": "github.com/ramonruanxc/delphi-concurrent-pool",
+  "description": "A bounded blocking queue, a worker that owns its thread, and a fixed-size pool, for Delphi and Free Pascal.",
+  "version": "1.0.0",
+  "homepage": "https://github.com/ramonruanxc/delphi-concurrent-pool",
+  "mainsrc": "src",
+  "license": "MIT",
+  "dependencies": {}
+}

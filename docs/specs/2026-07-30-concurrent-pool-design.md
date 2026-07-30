@@ -45,27 +45,34 @@ i386-win32 column is a developer machine; the x86_64-linux column is the CI
 runner. Re-measuring on the CI target was not ceremony — it corrected the
 design twice (see "Corrections" below).
 
-| Fact | i386-win32 | x86_64-linux |
-| --- | --- | --- |
-| `GetTickCount64` exists, monotonic (200k samples) | yes, 0 backwards | yes, 0 backwards |
-| `Cardinal` subtraction wraps safely | 10 | 10 |
-| manual-reset `TEvent`: one `SetEvent` releases 4 parked waiters | 4 of 4 | 4 of 4 |
-| manual-reset `TEvent`: a waiter arriving *after* `SetEvent` passes | yes | yes |
-| auto-reset `TEvent`: two `SetEvent` then two `WaitFor(0)` | signalled, then timeout | signalled, then timeout |
-| `except ... else` catches `raise TObject.Create` | yes | yes |
-| assertions active under `-Sa` | yes | yes |
-| uninitialised local record field reads garbage | 22735472 | -1599891312 |
-| record guard fires on uninitialised use | `EAssertionFailed` | `EAssertionFailed` |
-| record guard fires on by-value copy | `EAssertionFailed` | `EAssertionFailed` |
-| generic class with `TCriticalSection` + `TEvent` + `array of T` | runs | runs |
-| `InterLockedIncrement` / `Decrement` return | NEW value | NEW value |
-| `InterLockedExchangeAdd` / `Exchange` / `CompareExchange` return | OLD value | OLD value |
-| `SizeOf(LongInt)` | 4 | 4 |
-| `SizeOf(Pointer)` | 4 | 8 |
-| `SizeOf(TThreadID)` | 4 | **8** |
-| `SizeOf` of the guarded counter record | 12 | 16 |
-| heaptrc on a deliberate leak | — | `1 unfreed memory blocks : 8`, **exit code 0** |
-| CI runner cores (`nproc`) | — | **2** |
+The third column is Delphi 12 on Windows, added once the probe was run there
+too — so every claim is now measured on all three compilers-and-targets the
+library is expected to build under.
+
+| Fact | FPC i386-win32 | FPC x86_64-linux | Delphi 12 win32 |
+| --- | --- | --- | --- |
+| `GetTickCount64` exists, monotonic (200k samples) | yes, 0 backwards | yes, 0 backwards | yes, 0 backwards |
+| `Cardinal` subtraction with overflow checks **off** | 10 | 10 | 10 |
+| `Cardinal` subtraction with overflow checks **on** | (off by default) | (off by default) | **raises `EIntOverflow`** |
+| manual-reset `TEvent`: one `SetEvent` releases 4 parked waiters | 4 of 4 | 4 of 4 | 4 of 4 |
+| manual-reset `TEvent`: a waiter arriving *after* `SetEvent` passes | yes | yes | yes |
+| auto-reset `TEvent`: two `SetEvent` then two `WaitFor(0)` | signalled, then timeout | signalled, then timeout | signalled, then timeout |
+| `except ... else` catches `raise TObject.Create` | yes | yes | yes |
+| assertions active by default | under `-Sa` | under `-Sa` | yes, debug config |
+| uninitialised local record field reads garbage | 22735472 | -1599891312 | 7060772 |
+| record guard fires on uninitialised use | `EAssertionFailed` | `EAssertionFailed` | `EAssertionFailed` |
+| record guard fires on by-value copy | `EAssertionFailed` | `EAssertionFailed` | `EAssertionFailed` |
+| generic class with `TCriticalSection` + `TEvent` + `array of T` | runs | runs | runs |
+| `InterLockedIncrement` / `Decrement` return | NEW value | NEW value | via `TInterlocked` |
+| `InterLockedExchangeAdd` / `Exchange` / `CompareExchange` return | OLD value | OLD value | OLD value |
+| `SizeOf(LongInt)` | 4 | 4 | 4 |
+| `SizeOf(Pointer)` | 4 | 8 | 4 |
+| `SizeOf(TThreadID)` | 4 | **8** | 4 |
+| `SizeOf` of the guarded counter record | 12 | 16 | 12 |
+| heaptrc on a deliberate leak | — | `1 unfreed memory blocks : 8`, **exit code 0** | n/a |
+| CI runner cores (`nproc`) | — | **2** | — |
+
+The overflow row is the one that changed the code: see correction 5 below.
 
 ### Corrections the probe forced
 
@@ -92,6 +99,19 @@ the CI target and make self-join detection fail exactly where the tests run.
 is mandatory rather than stylistic. And the pattern must be anchored — an
 unanchored `0 unfreed memory blocks` also matches `10 unfreed memory blocks`.
 The gate is `grep -qE '^0 unfreed memory blocks'`.
+
+**5. Overflow checking differs by compiler default, so the library must not rely
+on wraparound.** Delphi turns overflow checking on in a default debug
+configuration; Free Pascal leaves it off. The same `Cardinal` subtraction
+therefore returns a wrapped value on one compiler and raises `EIntOverflow` on
+the other — behaviour decided by a build switch, which is no basis for a
+timeout. `Elapsed` was rewritten to keep its arithmetic in `UInt64`, where a
+millisecond counter cannot realistically roll over, and to handle a
+backwards-running clock with a comparison rather than by wrapping. Nothing in
+the library depends on the setting.
+
+**6. `PtrUInt` is Free Pascal only.** The alignment assertion in the atomic
+counter uses `NativeUInt`, which exists on both compilers.
 
 **4. The runner has 2 cores.** The lost-update proof is the one statistical
 proof in the repo, and 2 cores is thin. It widens the race window deliberately,

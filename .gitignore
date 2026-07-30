@@ -1,4 +1,35 @@
+# Build output
 build/
+bin/
 *.exe
-*.o
+*.dcu
 *.ppu
+*.o
+*.a
+*.compiled
+*.identcache
+*.local
+*.dsk
+*.map
+*.res
+__history/
+__recovery/
+Win32/
+Win64/
+
+# Test artefacts
+heap.log
+wd.log
+
+# The throwaway platform probe. Its measurements are recorded in
+# docs/specs/2026-07-30-concurrent-pool-design.md; the program itself was
+# deleted once they were.
+probe/
+
+# Boss
+modules/
+boss-lock.json
+
+# Editors
+.vscode/
+.idea/

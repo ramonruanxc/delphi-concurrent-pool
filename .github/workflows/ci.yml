@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Suite, leak gate and four negative builds (Free Pascal, Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Free Pascal
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fpc
+          fpc -iV
+
+      # The lost-update proof needs more than one core to observe anything.
+      # Printed so a surprising result on a future runner has an explanation.
+      - name: Cores available
+        run: nproc
+
+      # -Sa turns assertions on. Without it the atomic counter's guard is
+      # compiled out and its test proves nothing.
+      - name: Build the suite
+        run: |
+          mkdir -p build/normal
+          fpc -Mdelphi -Sa -Fusrc -Futests -FUbuild/normal -obuild/Tests tests/Tests.dpr
+
+      - name: Run the suite
+        run: timeout 180 ./build/Tests
+
+      # heaptrc reports leaks on stdout but leaves the exit code at 0 (measured),
+      # so the grep is mandatory rather than stylistic. It is ANCHORED because an
+      # unanchored '0 unfreed memory blocks' also matches '10 unfreed'.
+      - name: Leak gate
+        run: |
+          mkdir -p build/heap
+          fpc -Mdelphi -Sa -gh -gl -Fusrc -Futests -FUbuild/heap -obuild/TestsHeap tests/Tests.dpr
+          set +e
+          timeout 240 ./build/TestsHeap --no-guards > heap.log 2>&1
+          code=$?
+          set -e
+          tail -20 heap.log
+          if [ "$code" -ne 0 ]; then
+            echo "::error::the suite failed under heaptrc (exit $code)"
+            exit 1
+          fi
+          if ! grep -qE '^0 unfreed memory blocks' heap.log; then
+            echo "::error::heaptrc reported unfreed memory"
+            grep -E 'unfreed memory blocks' heap.log || true
+            exit 1
+          fi
+          echo "no leaks"
+
+      # Each negative build removes exactly ONE safety property and MUST fail.
+      # A separate -FU directory per build is not optional: Free Pascal does not
+      # treat a changed -d define as a reason to recompile, so sharing a unit
+      # output directory silently reuses the protected units and makes the whole
+      # check meaningless.
+      #
+      # --no-guards keeps the one deliberately-raising test out of these runs, so
+      # a failure here can only come from the removed protection.
+      - name: Negative build — PROVE_SWALLOW (fault capture)
+        run: |
+          mkdir -p build/n1
+          fpc -Mdelphi -Sa -dPROVE_SWALLOW -Fusrc -Futests -FUbuild/n1 -obuild/n1/T tests/Tests.dpr
+          if timeout 180 ./build/n1/T --no-guards; then
+            echo "::error::the suite passed with fault capture removed"
+            exit 1
+          fi
+          echo "correct: fails without fault capture"
+
+      - name: Negative build — PROVE_NOWAKE (Close wakeups)
+        run: |
+          mkdir -p build/n2
+          fpc -Mdelphi -Sa -dPROVE_NOWAKE -Fusrc -Futests -FUbuild/n2 -obuild/n2/T tests/Tests.dpr
+          if timeout 180 ./build/n2/T --no-guards; then
+            echo "::error::the suite passed with the Close wakeups removed"
+            exit 1
+          fi
+          echo "correct: fails without the Close wakeups"
+
+      - name: Negative build — PROVE_RACE_QUEUE (the ring's lock)
+        run: |
+          mkdir -p build/n3
+          fpc -Mdelphi -Sa -dPROVE_RACE_QUEUE -Fusrc -Futests -FUbuild/n3 -obuild/n3/T tests/Tests.dpr
+          if timeout 180 ./build/n3/T --no-guards; then
+            echo "::error::the suite passed with the queue's lock removed"
+            exit 1
+          fi
+          echo "correct: fails without the queue's lock"
+
+      # The only statistical proof here: observing a lost update needs real
+      # parallelism, and the runner has two cores. Retried, and deliberately not
+      # the proof the README leads with.
+      - name: Negative build — PROVE_RACE_ATOMIC (interlocked mutators)
+        run: |
+          mkdir -p build/n4
+          fpc -Mdelphi -Sa -dPROVE_RACE_ATOMIC -Fusrc -Futests -FUbuild/n4 -obuild/n4/T tests/Tests.dpr
+          for attempt in 1 2 3; do
+            echo "attempt $attempt"
+            if timeout 180 ./build/n4/T --no-guards; then
+              echo "attempt $attempt passed; retrying"
+            else
+              echo "correct: fails without the interlocked mutators"
+              exit 0
+            fi
+          done
+          echo "::error::the suite passed three times with the interlocked mutators removed"
+          exit 1
+
+      # The watchdog is what turns a deadlock into a named failure instead of a
+      # dead runner, so it is verified rather than assumed. A limit of zero arms
+      # it immediately; it must halt with exit 2 and name a test.
+      - name: The watchdog itself halts and names the test
+        run: |
+          set +e
+          timeout 120 ./build/Tests --no-guards --watchdog=0 > wd.log 2>&1
+          code=$?
+          set -e
+          grep -A1 'WATCHDOG' wd.log || true
+          if [ "$code" -ne 2 ]; then
+            echo "::error::expected exit 2 from the watchdog, got $code"
+            exit 1
+          fi
+          grep -q 'WATCHDOG: test "' wd.log || {
+            echo "::error::the watchdog did not name the test it halted on"
+            exit 1
+          }
+          echo "correct: the watchdog halts and names the test"
+
+      - name: Build the demos
+        run: |
+          mkdir -p build/demo
+          fpc -Mdelphi -Sa -Fusrc -FUbuild/demo -obuild/demo/AsyncSink demo/AsyncSink.dpr
+          fpc -Mdelphi -Sa -Fusrc -FUbuild/demo -obuild/demo/Pipeline demo/Pipeline.dpr
+
+      - name: Run the demos
+        run: |
+          timeout 120 ./build/demo/AsyncSink
+          timeout 120 ./build/demo/Pipeline
