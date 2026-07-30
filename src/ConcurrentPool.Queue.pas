@@ -87,8 +87,15 @@ type
     destructor Destroy; override;
 
     { Blocks while the queue is full, up to ATimeoutMs measured as ONE deadline
-      across all wakes. Push(item, 0) is the non-blocking try form. }
-    function Push(const AItem: T; ATimeoutMs: Cardinal): TQueueWait;
+      across all wakes. Push(item, 0) is the non-blocking try form.
+
+      AItem is taken BY VALUE rather than as const. For a managed T — an
+      interface, a string — a const parameter takes no reference, so an item
+      created inline and then REFUSED by a full or closed queue would never be
+      referenced by anything and would never be released. By value it holds a
+      reference for the duration of the call. For a plain T the copy is a
+      register move. }
+    function Push(AItem: T; ATimeoutMs: Cardinal): TQueueWait;
 
     { Blocks while the queue is empty. Items already queued are drained before
       qwClosed is reported, so nothing is lost by a Close that races a Pop. }
@@ -235,7 +242,7 @@ begin
   Dec(FCount);
 end;
 
-function TBoundedQueue<T>.Push(const AItem: T; ATimeoutMs: Cardinal): TQueueWait;
+function TBoundedQueue<T>.Push(AItem: T; ATimeoutMs: Cardinal): TQueueWait;
 var
   Start: UInt64;
   Wait: Cardinal;

@@ -41,22 +41,43 @@ uses
   ConcurrentPool.Testing in 'ConcurrentPool.Testing.pas',
   ConcurrentPool.Tests in 'ConcurrentPool.Tests.pas';
 
-{ Reads --watchdog=N. FindCmdLineSwitch does not hand back a value, so the
-  parameters are walked directly. }
+{ The parameters are walked directly rather than through FindCmdLineSwitch,
+  which takes a set of PREFIX CHARACTERS and so does not match a GNU-style
+  double dash: given ['-'], '--no-guards' is read as the switch '-no-guards' and
+  silently fails to match 'no-guards'. That is how the flag came to be ignored in
+  CI, running a test the run had asked to skip. }
+function HasFlag(const AName: string): Boolean;
+var
+  I: Integer;
+  P: string;
+begin
+  for I := 1 to ParamCount do
+  begin
+    P := ParamStr(I);
+    if SameText(P, '--' + AName) or SameText(P, '-' + AName) or
+       SameText(P, '/' + AName) then
+      Exit(True);
+  end;
+  Result := False;
+end;
+
+{ Reads --watchdog=N (or -watchdog=N). }
 function GetWatchdogArg: string;
 var
   I: Integer;
   P: string;
-const
-  Prefix = '--watchdog=';
+  Eq: Integer;
 begin
   Result := '';
   for I := 1 to ParamCount do
   begin
     P := ParamStr(I);
-    if (Length(P) > Length(Prefix)) and
-       SameText(Copy(P, 1, Length(Prefix)), Prefix) then
-      Exit(Copy(P, Length(Prefix) + 1, MaxInt));
+    Eq := Pos('=', P);
+    if Eq = 0 then
+      Continue;
+    if SameText(Copy(P, 1, Eq - 1), '--watchdog') or
+       SameText(Copy(P, 1, Eq - 1), '-watchdog') then
+      Exit(Copy(P, Eq + 1, MaxInt));
   end;
 end;
 
@@ -78,7 +99,7 @@ begin
   WriteLn('asserts  : OFF — build with -Sa, or the guard test proves nothing');
   {$ENDIF}
 
-  RunGuards := not FindCmdLineSwitch('no-guards', ['-', '/'], True);
+  RunGuards := not HasFlag('no-guards');
   if not RunGuards then
     WriteLn('guards   : skipped (--no-guards)')
   else

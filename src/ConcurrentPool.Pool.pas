@@ -70,16 +70,30 @@ type
     constructor Create(AWorkerCount, AQueueCapacity: Integer);
     destructor Destroy; override;
 
-    { Non-blocking by default. Pass a timeout to get back-pressure instead of an
+    { The interface is taken BY VALUE, not as const, and that is a correctness
+      decision rather than a style one.
+
+      A const interface parameter does not take a reference. So when a caller
+      writes the natural thing —
+
+          Pool.Submit(TMyJob.Create);
+
+      — and the queue REFUSES the item (qwClosed after a shutdown, or qwTimeout
+      on a full queue), nothing ever holds a reference to that object: it is
+      never stored, its refcount stays at zero, and it is never freed. A leak,
+      once per refused submission, in the path a caller is least likely to test.
+      Taking it by value gives it a reference for the duration of the call, so it
+      is released on the way out. Found by this repo's own leak gate.
+
+      Non-blocking by default. Pass a timeout to get back-pressure instead of an
       immediate qwTimeout when the queue is full. Returns qwClosed after a
-      shutdown — never raises, never blocks, and the runnable simply goes out of
-      scope rather than leaking.
+      shutdown — never raises, never blocks.
 
       A task may Submit. If it submits into a FULL queue while every worker is
       also blocked in Submit, that deadlocks — inherent to any bounded-queue
       pool, and the reason the timeout form exists: it lets a caller fail
       instead of hang. }
-    function Submit(const ARunnable: IRunnable;
+    function Submit(ARunnable: IRunnable;
       ATimeoutMs: Cardinal = 0): TQueueWait;
 
     { True when everything submitted has finished. }
@@ -292,7 +306,7 @@ begin
   end;
 end;
 
-function TWorkerPool.Submit(const ARunnable: IRunnable;
+function TWorkerPool.Submit(ARunnable: IRunnable;
   ATimeoutMs: Cardinal): TQueueWait;
 begin
   if ARunnable = nil then

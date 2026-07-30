@@ -96,7 +96,7 @@ type
     procedure ExecuteRunnable;
     procedure SignalFinished;
   public
-    constructor Create(const ARunnable: IRunnable);
+    constructor Create(ARunnable: IRunnable);
     destructor Destroy; override;
 
     { Creates and starts the thread. A second call raises EPoolState. }
@@ -265,7 +265,7 @@ end;
 
 { TWorker }
 
-constructor TWorker.Create(const ARunnable: IRunnable);
+constructor TWorker.Create(ARunnable: IRunnable);
 begin
   inherited Create;
   if ARunnable = nil then
