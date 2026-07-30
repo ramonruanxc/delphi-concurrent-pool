@@ -1,0 +1,70 @@
+name: Platform probe
+
+# Throwaway workflow. Its only job is to re-measure, on the x86_64-linux target
+# CI actually uses, every empirical claim that the library's design rests on —
+# because all the original measurements were taken on i386-win32, where record
+# layout, alignment, codegen and pthread event semantics can all differ.
+#
+# Deleted once its output is recorded in docs/specs.
+
+on:
+  push:
+    branches: ['probe/**']
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Probe (Free Pascal, x86_64 Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Free Pascal
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fpc
+          fpc -iV
+          echo "target CPU: $(fpc -iTP)"
+          echo "target OS:  $(fpc -iTO)"
+
+      - name: Cores available (the atomic-race proof depends on this)
+        run: nproc
+
+      # -Sa turns assertions on, which the record guard needs to be observable.
+      - name: Build and run the probe
+        run: |
+          mkdir -p build/p
+          fpc -Mdelphi -Sa -FUbuild/p -obuild/Probe probe/Probe.dpr
+          timeout 120 ./build/Probe
+
+      # The test suite's leak gate will grep heaptrc output for a literal
+      # string, so learn the exact format this runner produces — and confirm
+      # that a leak does NOT change the exit code, which is why a grep is
+      # mandatory rather than stylistic.
+      - name: heaptrc output format, and whether a leak changes the exit code
+        run: |
+          mkdir -p build/h
+          cat > build/leaky.dpr <<'EOF'
+          program leaky;
+          {$MODE DELPHI}{$H+}
+          type TThing = class end;
+          var A, B: TThing;
+          begin
+            A := TThing.Create;
+            B := TThing.Create;
+            B.Free;
+            WriteLn('leaked one object on purpose');
+          end.
+          EOF
+          fpc -Mdelphi -gh -gl -FUbuild/h -obuild/leaky build/leaky.dpr
+          set +e
+          ./build/leaky > heap.log 2>&1
+          code=$?
+          set -e
+          echo "----- exit code was: $code -----"
+          echo "----- heaptrc output -----"
+          cat heap.log
+          echo "--------------------------"
+          echo "grep for the literal the CI gate will use:"
+          grep -c 'unfreed memory blocks' heap.log || echo "literal NOT found — gate needs a different string"
