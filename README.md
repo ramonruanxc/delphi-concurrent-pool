@@ -24,6 +24,15 @@ end;
 
 ---
 
+## Execution flow
+
+![Execution flow of delphi-concurrent-pool](docs/images/architecture-flow.png)
+
+Producers submit jobs to a bounded FIFO queue. A fixed set of native workers
+executes accepted jobs; submissions can time out or encounter a closed queue.
+Shutdown drains work, while ShutdownNow drops pending jobs and requests
+cooperative cancellation.
+
 ## Why not System.Threading, or TThreadedQueue
 
 The first question a reviewer should ask, so it is answered before anything else.
