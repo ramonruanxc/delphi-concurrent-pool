@@ -17,6 +17,15 @@ __recovery/
 Win32/
 Win64/
 
+# Delphi IDE project files. The .dpr is the project; opening it makes the IDE
+# generate a .dproj in its own version's format, which an older IDE (XE7) may
+# refuse to open. Keeping them untracked is what lets any version open a clone.
+*.dproj
+*.dproj.local
+*.groupproj
+*.stat
+*.tvsconfig
+
 # Test artefacts
 heap.log
 wd.log
