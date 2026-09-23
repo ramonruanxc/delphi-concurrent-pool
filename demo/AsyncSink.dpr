@@ -19,8 +19,11 @@
   When the queue fills, a producer either waits or drops — and this demo does
   both, so the difference is visible in the numbers at the end.
 
-    Free Pascal   fpc -Mdelphi -Fu../src AsyncSink.dpr
-    Delphi        open in the IDE and build
+    Free Pascal   cd demo, then: fpc AsyncSink.dpr
+    Delphi        open this file in the IDE (XE7 or later) and press F9
+
+  Nothing to configure on either compiler: every unit below carries its path.
+  The last line printed is "RESULT: PASS ..." or "RESULT: FAIL ..." (exit 1).
 }
 program AsyncSink;
 
@@ -29,6 +32,8 @@ program AsyncSink;
   {$H+}
 {$ELSE}
   {$APPTYPE CONSOLE}
+  { DebugHook, used for the pause at the end, is marked `platform`. }
+  {$WARN SYMBOL_PLATFORM OFF}
 {$ENDIF}
 
 uses
@@ -123,7 +128,14 @@ end;
 
 { ------------------------------------------------------------- back-pressure }
 
-procedure RunWithBackPressure;
+{ True when the pool's accounting balances once it has shut down. }
+function Balanced(APool: TWorkerPool): Boolean;
+begin
+  Result := APool.Submitted =
+    APool.Completed + APool.Faulted + APool.Dropped;
+end;
+
+function RunWithBackPressure: Boolean;
 const
   LINES = 400;
 var
@@ -160,6 +172,10 @@ begin
     Report('Submitted = Completed + Faulted + Dropped',
       Format('%d = %d + %d + %d', [Pool.Submitted, Pool.Completed,
         Pool.Faulted, Pool.Dropped]));
+
+    { Waiting producers lose nothing: every line offered reached the sink. }
+    Result := (Accepted = LINES) and (Sink.Written = LINES) and
+      (Pool.Dropped = 0) and Balanced(Pool);
   finally
     Pool.Free;
     Sink.Free;
@@ -168,7 +184,7 @@ end;
 
 { -------------------------------------------------------------------- dropping }
 
-procedure RunWithDropping;
+function RunWithDropping: Boolean;
 const
   LINES = 400;
 var
@@ -209,22 +225,49 @@ begin
     Report('Submitted = Completed + Faulted + Dropped',
       Format('%d = %d + %d + %d', [Pool.Submitted, Pool.Completed,
         Pool.Faulted, Pool.Dropped]));
+
+    { How many are refused depends on timing; that every line is either
+      written or refused, and none twice, does not. }
+    Result := (Accepted + Refused = LINES) and
+      (Sink.Written = Accepted) and Balanced(Pool);
   finally
     Pool.Free;
     Sink.Free;
   end;
 end;
 
+var
+  BackPressureOk, DroppingOk: Boolean;
 begin
-  WriteLn('ConcurrentPool — async sink demo');
+  WriteLn('ConcurrentPool - async sink demo');
   WriteLn('A slow sink behind a bounded queue, drained by one worker.');
 
-  RunWithBackPressure;
-  RunWithDropping;
+  BackPressureOk := RunWithBackPressure;
+  DroppingOk := RunWithDropping;
 
   WriteLn;
   WriteLn('Note that in both runs the accounting balances exactly. That');
-  WriteLn('invariant — Submitted = Completed + Faulted + Dropped — is asserted');
+  WriteLn('invariant - Submitted = Completed + Faulted + Dropped - is asserted');
   WriteLn('at the end of every pool test, and is what proves no work is ever');
   WriteLn('lost or run twice.');
+  WriteLn;
+
+  if BackPressureOk and DroppingOk then
+    WriteLn('RESULT: PASS - AsyncSink: nothing lost with back-pressure, ' +
+      'every line accounted for when dropping.')
+  else
+  begin
+    WriteLn('RESULT: FAIL - AsyncSink: the numbers above do not balance.');
+    ExitCode := 1;
+  end;
+
+  { Keeps the console open when started from the Delphi IDE with F9. Never
+    pauses on Free Pascal, in CI, or when run from a command line. }
+  {$IFNDEF FPC}
+  if DebugHook <> 0 then
+  begin
+    Write('Press Enter to exit...');
+    ReadLn;
+  end;
+  {$ENDIF}
 end.
