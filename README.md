@@ -37,15 +37,15 @@ IDE needs nothing configured. It creates a `.dproj` next to the `.dpr` on first
 open; git ignores it. Under the debugger (F9) the console waits for Enter at the
 end; without it (Ctrl+Shift+F9) the window closes as soon as the demo finishes.
 
-**Free Pascal 3.2.2** — one command, from the `demo` folder:
+**Free Pascal 3.2.2** — one command, from the repository root:
 
 ```
-cd delphi-concurrent-pool/demo
-fpc AsyncSink.dpr
+cd delphi-concurrent-pool
+fpc demo/AsyncSink.dpr
 ```
 
-then run `./AsyncSink` (`AsyncSink.exe` on Windows). `fpc Pipeline.dpr` and
-`./Pipeline` likewise.
+then run `./demo/AsyncSink` (`demo\AsyncSink.exe` on Windows). `fpc demo/Pipeline.dpr`
+and `./demo/Pipeline` likewise.
 
 Each demo ends with one line, and exits 0:
 
@@ -117,9 +117,11 @@ on any Delphi — see the table above) and Free Pascal 3.2.2 in Delphi mode
 
 Every `.dpr` here lists its units with explicit `in '...'` paths, so opening one
 in the Delphi IDE and building works with nothing to configure. Free Pascal
-honours those paths too, which is why the Quick start command needs no flags.
+resolves `in` paths from the working directory instead, so each demo also
+declares an FPC-only `{$UNITPATH ../src}`; that is why the Quick start command
+needs no flags from the repository root.
 The test command lines below still pass `-Fu`, and build into their own `-FU`
-directory with `-B`: a plain `fpc AsyncSink.dpr` leaves `.ppu` files next to the
+directory with `-B`: a plain `fpc demo/AsyncSink.dpr` leaves `.ppu` files next to the
 sources in `src/`, and without `-B` a later build that searches `src` reuses
 them even when its defines differ.
 
@@ -367,9 +369,8 @@ anchored, because an unanchored `0 unfreed memory blocks` also matches
 ## Demos
 
 ```
-cd demo
-fpc AsyncSink.dpr && ./AsyncSink
-fpc Pipeline.dpr  && ./Pipeline
+fpc demo/AsyncSink.dpr && ./demo/AsyncSink
+fpc demo/Pipeline.dpr  && ./demo/Pipeline
 ```
 
 Or open either `.dpr` in the Delphi IDE and press F9 — see [Quick start](#quick-start).

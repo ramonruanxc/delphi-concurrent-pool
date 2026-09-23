@@ -19,7 +19,7 @@
   When the queue fills, a producer either waits or drops — and this demo does
   both, so the difference is visible in the numbers at the end.
 
-    Free Pascal   cd demo, then: fpc AsyncSink.dpr
+    Free Pascal   fpc demo/AsyncSink.dpr     (from the repository root)
     Delphi        open this file in the IDE (XE7 or later) and press F9
 
   Nothing to configure on either compiler: every unit below carries its path.
@@ -29,6 +29,9 @@ program AsyncSink;
 
 {$IFDEF FPC}
   {$MODE DELPHI}
+  { FPC resolves in-paths from the working directory; UNITPATH is relative
+    to this file, so the command above also works from the repository root. }
+  {$UNITPATH ../src}
   {$H+}
 {$ELSE}
   {$APPTYPE CONSOLE}

@@ -42,3 +42,9 @@ boss-lock.json
 # Editors
 .vscode/
 .idea/
+
+# Extensionless Unix demo binaries from the Quick start, and its CI logs
+/demo/AsyncSink
+/demo/Pipeline
+/asyncsink.log
+/pipeline.log

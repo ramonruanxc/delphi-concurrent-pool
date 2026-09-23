@@ -11,7 +11,7 @@
 
   Both are visible in the output.
 
-    Free Pascal   cd demo, then: fpc Pipeline.dpr
+    Free Pascal   fpc demo/Pipeline.dpr     (from the repository root)
     Delphi        open this file in the IDE (XE7 or later) and press F9
 
   Nothing to configure on either compiler: every unit below carries its path.
@@ -21,6 +21,9 @@ program Pipeline;
 
 {$IFDEF FPC}
   {$MODE DELPHI}
+  { FPC resolves in-paths from the working directory; UNITPATH is relative
+    to this file, so the command above also works from the repository root. }
+  {$UNITPATH ../src}
   {$H+}
 {$ELSE}
   {$APPTYPE CONSOLE}

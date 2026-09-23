@@ -151,13 +151,12 @@ jobs:
           timeout 120 ./build/demo/Pipeline
 
       # The README's Quick start, verbatim: no -Fu, no -FU, no defines, run from
-      # inside demo/. Last on purpose, because it writes unit files into src/.
+      # the repository root. Last on purpose, because it writes unit files into src/.
       - name: Quick start, exactly as documented
         run: |
-          cd demo
-          fpc AsyncSink.dpr
-          timeout 120 ./AsyncSink | tee asyncsink.log
+          fpc demo/AsyncSink.dpr
+          timeout 120 ./demo/AsyncSink | tee asyncsink.log
           grep -q '^RESULT: PASS' asyncsink.log
-          fpc Pipeline.dpr
-          timeout 120 ./Pipeline | tee pipeline.log
+          fpc demo/Pipeline.dpr
+          timeout 120 ./demo/Pipeline | tee pipeline.log
           grep -q '^RESULT: PASS' pipeline.log
