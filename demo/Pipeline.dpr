@@ -11,16 +11,24 @@
 
   Both are visible in the output.
 
-    Free Pascal   fpc -Mdelphi -Fu../src Pipeline.dpr
-    Delphi        open in the IDE and build
+    Free Pascal   fpc demo/Pipeline.dpr     (from the repository root)
+    Delphi        open this file in the IDE (XE7 or later) and press F9
+
+  Nothing to configure on either compiler: every unit below carries its path.
+  The last line printed is "RESULT: PASS ..." or "RESULT: FAIL ..." (exit 1).
 }
 program Pipeline;
 
 {$IFDEF FPC}
   {$MODE DELPHI}
+  { FPC resolves in-paths from the working directory; UNITPATH is relative
+    to this file, so the command above also works from the repository root. }
+  {$UNITPATH ../src}
   {$H+}
 {$ELSE}
   {$APPTYPE CONSOLE}
+  { DebugHook, used for the pause at the end, is marked `platform`. }
+  {$WARN SYMBOL_PLATFORM OFF}
 {$ENDIF}
 
 uses
@@ -136,9 +144,11 @@ end;
 
 { ----------------------------------------------------------------- faults }
 
-procedure ShowFaultIsolation;
+function ShowFaultIsolation: Boolean;
 const
   JOBS = 70;
+  { Every seventh of 1..70 throws. }
+  FAULTS = JOBS div 7;
 var
   Pool: TWorkerPool;
   Tally: TTally;
@@ -167,7 +177,12 @@ begin
       Format('%d = %d + %d + %d', [Pool.Submitted, Pool.Completed,
         Pool.Faulted, Pool.Dropped]));
 
-    Pool.Shutdown(10000);
+    Result := (Pool.Submitted = JOBS) and (Pool.Faulted = FAULTS) and
+      (Pool.Completed = JOBS - FAULTS) and (Tally.Ok.Value = JOBS - FAULTS) and
+      (Pool.Dropped = 0);
+
+    if not Pool.Shutdown(10000) then
+      Result := False;
   finally
     Pool.Free;
     Tally.Free;
@@ -176,13 +191,14 @@ end;
 
 { ------------------------------------------------------------ cancellation }
 
-procedure ShowCancellation;
+function ShowCancellation: Boolean;
 var
   Pool: TWorkerPool;
   Polling: TPollingJob;
   Parked: TParkedJob;
   PollingRef, ParkedRef: IRunnable;
   T0: UInt64;
+  Stopped: Boolean;
 begin
   WriteLn;
   WriteLn('Cancellation reaches a task that is WAITING, not just one that polls.');
@@ -203,28 +219,52 @@ begin
 
     T0 := Ticks;
     { ShutdownNow cancels every worker, so both tasks are asked to stop. }
-    Pool.ShutdownNow(10000);
+    Stopped := Pool.ShutdownNow(10000);
 
     Report('shutdown took (ms)', IntToStr(Elapsed(T0)));
     Report('polling job units before it stopped', IntToStr(Polling.UnitsDone));
     Report('parked job was released by cancel',
       BoolToStr(Parked.ReleasedByCancel, True));
     Report('parked job waited (ms)', IntToStr(Parked.WaitedMs) +
-      ' — not its 30000 ms timeout');
+      ' - not its 30000 ms timeout');
+
+    Result := Stopped and (Polling.UnitsDone > 0) and Parked.ReleasedByCancel;
   finally
     Pool.Free;
   end;
 end;
 
+var
+  FaultsOk, CancelOk: Boolean;
 begin
-  WriteLn('ConcurrentPool — faults and cancellation demo');
+  WriteLn('ConcurrentPool - faults and cancellation demo');
 
-  ShowFaultIsolation;
-  ShowCancellation;
+  FaultsOk := ShowFaultIsolation;
+  CancelOk := ShowCancellation;
 
   WriteLn;
   WriteLn('The parked job is the one worth noticing. A cancellation token that');
   WriteLn('could only be polled would never have released it, and the shutdown');
-  WriteLn('would have waited out its full timeout — or blocked forever, had the');
+  WriteLn('would have waited out its full timeout - or blocked forever, had the');
   WriteLn('timeout been infinite.');
+  WriteLn;
+
+  if FaultsOk and CancelOk then
+    WriteLn('RESULT: PASS - Pipeline: faults isolated and counted, ' +
+      'the parked task released by cancellation.')
+  else
+  begin
+    WriteLn('RESULT: FAIL - Pipeline: see the numbers above.');
+    ExitCode := 1;
+  end;
+
+  { Keeps the console open when started from the Delphi IDE with F9. Never
+    pauses on Free Pascal, in CI, or when run from a command line. }
+  {$IFNDEF FPC}
+  if DebugHook <> 0 then
+  begin
+    Write('Press Enter to exit...');
+    ReadLn;
+  end;
+  {$ENDIF}
 end.

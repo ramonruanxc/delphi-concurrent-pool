@@ -22,6 +22,47 @@ finally
 end;
 ```
 
+## Quick start
+
+```
+git clone https://github.com/ramonruanxc/delphi-concurrent-pool.git
+```
+
+(or download the ZIP from GitHub and extract it). Nothing else: no search path,
+no defines, no project options, no Boss, no submodules.
+
+**Delphi XE7 or later** — open `demo/AsyncSink.dpr` (or `demo/Pipeline.dpr`) and
+press **F9**. Every unit is listed in the `.dpr` with its relative path, so the
+IDE needs nothing configured. It creates a `.dproj` next to the `.dpr` on first
+open; git ignores it. Under the debugger (F9) the console waits for Enter at the
+end; without it (Ctrl+Shift+F9) the window closes as soon as the demo finishes.
+
+**Free Pascal 3.2.2** — one command, from the repository root:
+
+```
+cd delphi-concurrent-pool
+fpc demo/AsyncSink.dpr
+```
+
+then run `./demo/AsyncSink` (`demo\AsyncSink.exe` on Windows). `fpc demo/Pipeline.dpr`
+and `./demo/Pipeline` likewise.
+
+Each demo ends with one line, and exits 0:
+
+```
+RESULT: PASS - AsyncSink: nothing lost with back-pressure, every line accounted for when dropping.
+RESULT: PASS - Pipeline: faults isolated and counted, the parked task released by cancellation.
+```
+
+Anything else prints `RESULT: FAIL - ...` and exits 1. AsyncSink takes about six
+seconds, on purpose: its first half is a deliberately slow sink.
+
+| Compiler | Status |
+| --- | --- |
+| Free Pascal 3.2.2, x86_64-linux | **Verified in CI** on every push: the suite, the leak gate, four negative builds, both demos, and the Quick start command above, verbatim. |
+| Free Pascal 3.2.2, i386-win32 | Run locally by hand, not in CI. |
+| Delphi XE7 or later | **Intended target, not yet executed.** The code avoids RTL calls newer than XE7 (CompilerVersion 28), but no Delphi has compiled this version: none can be licensed on a CI runner, and the Community Edition refuses command-line builds. If F9 fails for you, please open an issue with the compiler message. |
+
 ---
 
 ## Execution flow
@@ -70,13 +111,19 @@ With [Boss](https://github.com/HashLoad/boss):
 boss install github.com/ramonruanxc/delphi-concurrent-pool
 ```
 
-Or add `src` to your search path. Requires Delphi 10.1 Berlin or later, or Free
-Pascal 3.2 with `-Mdelphi`.
+Or add `src` to your search path. Targets Delphi XE7 or later (not yet compiled
+on any Delphi — see the table above) and Free Pascal 3.2.2 in Delphi mode
+(verified in CI).
 
 Every `.dpr` here lists its units with explicit `in '...'` paths, so opening one
 in the Delphi IDE and building works with nothing to configure. Free Pascal
-resolves units from `-Fu` and ignores those, so the FPC command lines below pass
-the paths.
+resolves `in` paths from the working directory instead, so each demo also
+declares an FPC-only `{$UNITPATH ../src}`; that is why the Quick start command
+needs no flags from the repository root.
+The test command lines below still pass `-Fu`, and build into their own `-FU`
+directory with `-B`: a plain `fpc demo/AsyncSink.dpr` leaves `.ppu` files next to the
+sources in `src/`, and without `-B` a later build that searches `src` reuses
+them even when its defines differ.
 
 **Build the test suite with assertions on** (`-Sa`, or a Delphi debug config).
 One of the safety mechanisms *is* an assertion; without it that test proves
@@ -257,7 +304,7 @@ counter reached N*.
 
 ```
 mkdir -p build/normal
-fpc -Mdelphi -Sa -Fusrc -Futests -FUbuild/normal -obuild/Tests tests/Tests.dpr
+fpc -B -Mdelphi -Sa -Fusrc -Futests -FUbuild/normal -obuild/Tests tests/Tests.dpr
 ./build/Tests
 ```
 
@@ -322,9 +369,11 @@ anchored, because an unanchored `0 unfreed memory blocks` also matches
 ## Demos
 
 ```
-fpc -Mdelphi -Fusrc -FUbuild -obuild/AsyncSink demo/AsyncSink.dpr && ./build/AsyncSink
-fpc -Mdelphi -Fusrc -FUbuild -obuild/Pipeline  demo/Pipeline.dpr  && ./build/Pipeline
+fpc demo/AsyncSink.dpr && ./demo/AsyncSink
+fpc demo/Pipeline.dpr  && ./demo/Pipeline
 ```
+
+Or open either `.dpr` in the Delphi IDE and press F9 — see [Quick start](#quick-start).
 
 **`AsyncSink`** puts a bounded queue in front of a deliberately slow sink and
 runs the same 400 lines twice — once with back-pressure, once dropping — so the

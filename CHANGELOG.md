@@ -2,6 +2,23 @@
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Clone and run: a Quick start in the README, and demos that end with a single
+  `RESULT: PASS` / `RESULT: FAIL` line (exit 1 on failure) and, in the Delphi
+  IDE under the debugger, wait for Enter instead of closing the console.
+- Delphi XE7 is the stated minimum (was 10.1 Berlin). `Ticks` no longer uses
+  `TThread.GetTickCount64`, which is newer than XE7: Delphi for Windows imports
+  `GetTickCount64` from kernel32, other Delphi targets use `TStopwatch`. Not yet
+  compiled on any Delphi.
+- String literals are ASCII-only, so no source depends on how Delphi guesses
+  the encoding of a file without a BOM.
+- Every Free Pascal build line in CI and the README passes `-B`, so `.ppu` files
+  left in `src/` by the Quick start cannot be reused by a negative build. CI also
+  runs the Quick start verbatim.
+
 ## [1.0.0] — unreleased
 
 First release. A bounded queue, a worker and a pool, extracted from a personal

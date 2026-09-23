@@ -1,7 +1,7 @@
 {
   ConcurrentPool test runner.
 
-    Free Pascal   fpc -Mdelphi -Sa -Fu../src -Fu. -FU<out> -o<out>/Tests Tests.dpr
+    Free Pascal   fpc -B -Mdelphi -Sa -Fu../src -Fu. -FU<out> -o<out>/Tests Tests.dpr
     Delphi        open in the IDE and build; the uses clause carries the paths
 
   -Sa matters: the atomic counter's guard is an assertion, so without it the
@@ -32,7 +32,7 @@ uses
   {$IFEND}
   {$IFDEF FPC}SysUtils{$ELSE}System.SysUtils{$ENDIF},
   { Every unit with its path, so the Delphi IDE needs nothing configured. Free
-    Pascal resolves from -Fu and ignores these. }
+    Pascal honours these paths as well. }
   ConcurrentPool.Types in '../src/ConcurrentPool.Types.pas',
   ConcurrentPool.Atomic in '../src/ConcurrentPool.Atomic.pas',
   ConcurrentPool.Queue in '../src/ConcurrentPool.Queue.pas',
@@ -96,7 +96,7 @@ begin
   {$IFOPT C+}
   WriteLn('asserts  : on');
   {$ELSE}
-  WriteLn('asserts  : OFF — build with -Sa, or the guard test proves nothing');
+  WriteLn('asserts  : OFF - build with -Sa, or the guard test proves nothing');
   {$ENDIF}
 
   RunGuards := not HasFlag('no-guards');
