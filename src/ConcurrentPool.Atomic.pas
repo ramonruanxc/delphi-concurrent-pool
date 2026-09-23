@@ -81,7 +81,7 @@ implementation
 procedure TAtomicCounter.CheckGuard;
 begin
   Assert(FMagic = ATOMIC_MAGIC,
-    'TAtomicCounter used without Init — a local, or a field never initialised.');
+    'TAtomicCounter used without Init - a local, or a field never initialised.');
   Assert(FOwner = @Self,
     'TAtomicCounter was copied by value; the copy and the original are now ' +
     'separate counters. It is valid only as a class field, a global, or an ' +

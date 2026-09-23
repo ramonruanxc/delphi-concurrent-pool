@@ -350,7 +350,7 @@ procedure TestAtomicBasics(R: TTestRunner);
 var
   H: THolder;
 begin
-  R.Suite('Atomic counter — deterministic');
+  R.Suite('Atomic counter - deterministic');
   H := THolder.Create;
   try
     R.AreEqual('starts at zero', 0, H.Counter.Value);
@@ -377,7 +377,7 @@ var
   Local: TAtomicCounter;
   Fired: Boolean;
 begin
-  R.Suite('Atomic counter — the guard (raises on purpose)');
+  R.Suite('Atomic counter - the guard (raises on purpose)');
 
   { An uninitialised local of a non-managed record is not zeroed; measured
     garbage on all three toolchains. The guard turns a silent wrong answer into
@@ -400,7 +400,7 @@ var
   V: Integer;
   Raised: Boolean;
 begin
-  R.Suite('Bounded queue — single thread, deterministic');
+  R.Suite('Bounded queue - single thread, deterministic');
 
   Raised := False;
   try
@@ -446,7 +446,7 @@ var
   Q: TBoundedQueue<Integer>;
   V: Integer;
 begin
-  R.Suite('Bounded queue — Close, deterministic');
+  R.Suite('Bounded queue - Close, deterministic');
 
   Q := TBoundedQueue<Integer>.Create(4);
   try
@@ -490,7 +490,7 @@ var
   T0: UInt64;
   Waited: Cardinal;
 begin
-  R.Suite('Bounded queue — blocking is real');
+  R.Suite('Bounded queue - blocking is real');
 
   Q := TBoundedQueue<Integer>.Create(1);
   try
@@ -536,7 +536,7 @@ var
   T0: UInt64;
   Took: Cardinal;
 begin
-  R.Suite('Bounded queue — Close releases parked threads promptly');
+  R.Suite('Bounded queue - Close releases parked threads promptly');
 
   { The deadlock that bounded-queue implementations usually ship with: a
     producer parked on a full queue when the queue is closed. }
@@ -609,7 +609,7 @@ var
   Cons: array[0..CONSUMERS - 1] of TConsumer;
   I, Per, GotTotal, Dups, Missing: Integer;
 begin
-  R.Suite('Bounded queue — nothing lost, nothing duplicated');
+  R.Suite('Bounded queue - nothing lost, nothing duplicated');
 
   SetLength(Seen, TOTAL);
   Lock := TCriticalSection.Create;
@@ -676,7 +676,7 @@ var
   Task: IRunnable;
   Raised: Boolean;
 begin
-  R.Suite('Worker — lifecycle, deterministic');
+  R.Suite('Worker - lifecycle, deterministic');
 
   H := THolder.Create;
   try
@@ -726,7 +726,7 @@ var
   W: TWorker;
   Task: IRunnable;
 begin
-  R.Suite('Worker — faults are captured, not swallowed');
+  R.Suite('Worker - faults are captured, not swallowed');
 
   { THE FLAGSHIP. Under -dPROVE_SWALLOW these four assertions fail on every run,
     on any core count, on any OS: the exception unwinds into the RTL, parks in
@@ -766,7 +766,7 @@ var
   Task: IRunnable;
   T0: UInt64;
 begin
-  R.Suite('Worker — cancellation is cooperative');
+  R.Suite('Worker - cancellation is cooperative');
 
   Polling := TPollingTask.Create;
   Task := Polling;
@@ -812,7 +812,7 @@ var
   H: THolder;
   I, Accepted: Integer;
 begin
-  R.Suite('Pool — the accounting invariant');
+  R.Suite('Pool - the accounting invariant');
 
   H := THolder.Create;
   P := TWorkerPool.Create(4, 32);
@@ -859,7 +859,7 @@ var
   H: THolder;
   I: Integer;
 begin
-  R.Suite('Pool — a faulting task does not shrink the pool');
+  R.Suite('Pool - a faulting task does not shrink the pool');
 
   H := THolder.Create;
   P := TWorkerPool.Create(2, 16);
@@ -884,7 +884,7 @@ begin
     H.Free;
   end;
 
-  R.Suite('Pool — ShutdownNow accounts for abandoned work');
+  R.Suite('Pool - ShutdownNow accounts for abandoned work');
   H := THolder.Create;
   { One worker, small queue, so work backs up and there is something to abandon. }
   P := TWorkerPool.Create(1, 64);
@@ -910,7 +910,7 @@ var
   Task: TSelfJoinTask;
   Ref: IRunnable;
 begin
-  R.Suite('Pool — waiting on yourself raises instead of hanging');
+  R.Suite('Pool - waiting on yourself raises instead of hanging');
 
   P := TWorkerPool.Create(2, 8);
   try
@@ -938,7 +938,7 @@ var
   T: array[0..THREADS - 1] of TBumper;
   I: Integer;
 begin
-  R.Suite('Atomic counter — under contention (STATISTICAL)');
+  R.Suite('Atomic counter - under contention (STATISTICAL)');
 
   { The only proof in this repo that is not airtight: it needs more than one
     core to observe a lost update, and the CI runner has two. The window is
